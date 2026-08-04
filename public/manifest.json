@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Group",
+  "version": "0.1.0",
+  "description": "Organize suas abas em grupos: agrupe por dominio, crie grupos manuais e gerencie tudo em um popup.",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabs", "tabGroups", "storage", "contextMenus"],
+  "action": {
+    "default_title": "Tab Group",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "group-by-domain": {
+      "suggested_key": { "default": "Alt+Shift+G" },
+      "description": "Agrupar as abas da janela atual por dominio"
+    },
+    "ungroup-all": {
+      "suggested_key": { "default": "Alt+Shift+U" },
+      "description": "Desagrupar todas as abas da janela atual"
+    },
+    "collapse-others": {
+      "description": "Recolher todos os grupos, exceto o da aba ativa"
+    }
+  }
+}
