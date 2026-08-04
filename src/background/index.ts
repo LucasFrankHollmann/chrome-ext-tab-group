@@ -1,7 +1,6 @@
 import {
   autoGroupTab,
   collapseAll,
-  collapseOthers,
   getCurrentWindowId,
   groupByDomain,
   ungroupAll,
@@ -76,30 +75,48 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 })
 
-chrome.commands.onCommand.addListener(async (command) => {
-  const windowId = await getCurrentWindowId()
+// onCreated e onUpdated podem disparar quase juntos para a mesma aba; enfileirar
+// evita que duas execucoes criem dois grupos para o mesmo dominio.
+let queue: Promise<void> = Promise.resolve()
 
-  switch (command) {
-    case 'group-by-domain':
-      await groupByDomain(windowId)
-      break
-    case 'ungroup-all':
-      await ungroupAll(windowId)
-      break
-    case 'collapse-others':
-      await collapseOthers(windowId)
-      break
-  }
-})
+function enqueueAutoGroup(tab: chrome.tabs.Tab) {
+  const tabId = tab.id
+  if (tabId == null) return
+
+  queue = queue.then(async () => {
+    try {
+      // Releitura: na hora de rodar, a aba pode ja ter sido movida/fechada.
+      const tab = await chrome.tabs.get(tabId)
+      const outcome = await autoGroupTab(tab)
+      console.log('[tab-group]', tab.url, '→', outcome)
+    } catch (error) {
+      console.error('[tab-group] autoGroupTab', error)
+    }
+  })
+}
 
 // Abas novas costumam nascer sem URL; esperamos o commit da navegacao
 // (changeInfo.url so aparece quando a URL efetivamente muda).
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
   if (!changeInfo.url) return
-  void autoGroupTab(tab).catch((error) => console.error('[tab-group] autoGroupTab', error))
+  enqueueAutoGroup(tab)
 })
 
 chrome.tabs.onCreated.addListener((tab) => {
   if (!tab.url && !tab.pendingUrl) return
-  void autoGroupTab(tab).catch((error) => console.error('[tab-group] autoGroupTab', error))
+  enqueueAutoGroup(tab)
+})
+
+// Trocar de aba recolhe os grupos da janela. O Chrome nao deixa recolher o grupo
+// que contem a aba ativa, entao esse fica aberto (os demais fecham).
+chrome.tabs.onActivated.addListener(({ windowId }) => {
+  queue = queue.then(async () => {
+    try {
+      const settings = await getSettings()
+      if (!settings.collapseOnTabSwitch) return
+      await collapseAll(windowId, true)
+    } catch (error) {
+      console.error('[tab-group] collapseOnTabSwitch', error)
+    }
+  })
 })

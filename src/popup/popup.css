@@ -154,6 +154,33 @@ button:focus-visible {
   color: var(--danger);
 }
 
+.btn--danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn--danger-solid:hover:not(:disabled) {
+  background: var(--danger);
+  filter: brightness(1.08);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.confirm__text {
+  flex: 1;
+  font-size: 12px;
+}
+
 .btn--icon {
   padding: 3px 6px;
   border-color: transparent;
@@ -232,10 +259,13 @@ button:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 7px 12px;
-  position: sticky;
-  top: 0;
   background: var(--bg);
-  z-index: 1;
+}
+
+.group__caret {
+  flex: none;
+  padding: 2px 3px;
+  color: var(--text-muted);
 }
 
 .group__dot {
@@ -275,6 +305,19 @@ button:focus-visible {
   list-style: none;
   margin: 0;
   padding: 0 0 4px;
+}
+
+/*
+ * Grupo recolhido mostra so o cabecalho; passar o mouse revela as abas e tirar
+ * o mouse recolhe de novo. O :focus-within mantem tudo acessivel pelo teclado.
+ */
+.group--collapsed .tab-list {
+  display: none;
+}
+
+.group--collapsed:hover .tab-list,
+.group--collapsed:focus-within .tab-list {
+  display: block;
 }
 
 .tab {
@@ -337,14 +380,6 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tab__badges {
-  display: flex;
-  gap: 3px;
-  flex: none;
-  font-size: 10px;
-  color: var(--text-muted);
 }
 
 .tab__actions {

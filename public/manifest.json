@@ -28,18 +28,5 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
-  },
-  "commands": {
-    "group-by-domain": {
-      "suggested_key": { "default": "Alt+Shift+G" },
-      "description": "Agrupar as abas da janela atual por dominio"
-    },
-    "ungroup-all": {
-      "suggested_key": { "default": "Alt+Shift+U" },
-      "description": "Desagrupar todas as abas da janela atual"
-    },
-    "collapse-others": {
-      "description": "Recolher todos os grupos, exceto o da aba ativa"
-    }
   }
 }

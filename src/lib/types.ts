@@ -39,9 +39,25 @@ export const GROUP_COLOR_HEX: Record<GroupColor, string> = {
   orange: '#fa903e',
 }
 
+/** Como uma aba nova escolhe seu grupo quando o agrupamento automatico esta ligado. */
+export type AutoGroupMode = 'domain' | 'preset'
+
+/** Grupo pre-definido pelo usuario: um nome fixo e os dominios que caem nele. */
+export interface GroupPreset {
+  id: string
+  title: string
+  color: GroupColor
+  /** Dominios normalizados ("youtube.com"); subdominios tambem casam. */
+  domains: string[]
+}
+
 export interface Settings {
   /** Agrupa automaticamente uma aba nova junto das outras do mesmo dominio. */
   autoGroupNewTabs: boolean
+  /** Regra usada pelo agrupamento automatico: por dominio ou por predefinicao. */
+  autoGroupMode: AutoGroupMode
+  /** Predefinicoes usadas quando `autoGroupMode` é 'preset'. */
+  presets: GroupPreset[]
   /** Minimo de abas do mesmo dominio para que "Agrupar por dominio" crie um grupo. */
   minTabsPerGroup: number
   /** Cor usada ao criar um grupo manualmente. */
@@ -50,16 +66,21 @@ export interface Settings {
   colorizeByDomain: boolean
   /** Recolhe os grupos recem-criados. */
   collapseNewGroups: boolean
+  /** Recolhe todos os grupos da janela sempre que a aba ativa muda. */
+  collapseOnTabSwitch: boolean
   /** Dominios que nunca devem ser agrupados automaticamente. */
   ignoredDomains: string[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   autoGroupNewTabs: false,
+  autoGroupMode: 'domain',
+  presets: [],
   minTabsPerGroup: 2,
   defaultColor: 'blue',
   colorizeByDomain: true,
   collapseNewGroups: false,
+  collapseOnTabSwitch: true,
   ignoredDomains: ['newtab', 'localhost'],
 }
 

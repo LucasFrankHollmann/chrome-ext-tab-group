@@ -82,12 +82,69 @@ body {
   justify-content: space-between;
 }
 
-.row input[type='checkbox'] {
+.row input[type='checkbox'],
+.row input[type='radio'] {
   margin-top: 2px;
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
   flex: none;
+}
+
+/* ---------- modos do agrupamento automatico ---------- */
+
+.modes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-left: 26px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+}
+
+.modes__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: -2px 0 6px 26px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--bg);
+}
+
+.preset__top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.preset__title {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.preset .swatch {
+  width: 22px;
+  height: 22px;
+}
+
+.preset .btn {
+  flex: none;
+  background: var(--card);
 }
 
 .row span {
@@ -158,25 +215,6 @@ textarea {
   color: var(--danger);
 }
 
-.shortcuts {
-  margin: 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--text-muted);
-}
-
-kbd {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-  color: var(--text);
-}
 
 .page__footer {
   display: flex;

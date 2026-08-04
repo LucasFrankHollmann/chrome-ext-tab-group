@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  activateTab,
   closeGroup,
   closeTabs,
   collapseAll,
-  groupByDomain,
   groupTabs,
-  setTabMuted,
-  setTabPinned,
   ungroupAll,
   ungroupTabs,
   updateGroup,
@@ -20,7 +16,10 @@ import { useTabs } from './useTabs'
 import './popup.css'
 
 interface Section {
+  key: string
+  /** null = secao virtual (abas fixadas ou abas sem grupo). */
   group: GroupInfo | null
+  label?: string
   tabs: TabInfo[]
 }
 
@@ -32,6 +31,8 @@ export default function App() {
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupColor, setNewGroupColor] = useState<GroupColor>('blue')
   const [busy, setBusy] = useState(false)
+  const [confirmUngroupAll, setConfirmUngroupAll] = useState(false)
+  const [pinnedCollapsed, setPinnedCollapsed] = useState(true)
 
   useEffect(() => {
     void getSettings().then((settings) => setNewGroupColor(settings.defaultColor))
@@ -46,6 +47,8 @@ export default function App() {
     })
   }, [tabs])
 
+  const filtering = query.trim().length > 0
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     if (!term) return tabs
@@ -57,10 +60,15 @@ export default function App() {
     )
   }, [tabs, query])
 
-  /** Secoes na ordem em que aparecem na barra de abas. */
+  /** Secoes na ordem em que aparecem na barra de abas; fixadas sempre no topo. */
   const sections = useMemo<Section[]>(() => {
+    const pinned: TabInfo[] = []
     const byGroup = new Map<number, TabInfo[]>()
     for (const tab of filtered) {
+      if (tab.pinned) {
+        pinned.push(tab)
+        continue
+      }
       const bucket = byGroup.get(tab.groupId)
       if (bucket) bucket.push(tab)
       else byGroup.set(tab.groupId, [tab])
@@ -68,14 +76,20 @@ export default function App() {
 
     const result: Section[] = []
     const ungrouped = byGroup.get(UNGROUPED)
-    if (ungrouped?.length) result.push({ group: null, tabs: ungrouped })
+    if (ungrouped?.length) result.push({ key: 'ungrouped', group: null, tabs: ungrouped })
 
     for (const group of groups) {
       const groupTabsList = byGroup.get(group.id)
-      if (groupTabsList?.length) result.push({ group, tabs: groupTabsList })
+      if (groupTabsList?.length) result.push({ key: `g${group.id}`, group, tabs: groupTabsList })
     }
 
-    return result.sort((a, b) => (a.tabs[0]?.index ?? 0) - (b.tabs[0]?.index ?? 0))
+    result.sort((a, b) => (a.tabs[0]?.index ?? 0) - (b.tabs[0]?.index ?? 0))
+
+    if (pinned.length) {
+      result.unshift({ key: 'pinned', group: null, label: 'Fixadas', tabs: pinned })
+    }
+
+    return result
   }, [filtered, groups])
 
   const selectedIds = useMemo(() => [...selected], [selected])
@@ -186,14 +200,6 @@ export default function App() {
         <div className="toolbar">
           <button
             type="button"
-            className="btn btn--primary"
-            disabled={busy || windowId == null}
-            onClick={() => void run(() => groupByDomain(windowId as number))}
-          >
-            Agrupar por dominio
-          </button>
-          <button
-            type="button"
             className="btn"
             disabled={busy || windowId == null}
             onClick={() => void run(() => collapseAll(windowId as number, true))}
@@ -210,13 +216,40 @@ export default function App() {
           </button>
           <button
             type="button"
-            className="btn"
+            className="btn btn--danger-solid"
             disabled={busy || windowId == null || groups.length === 0}
-            onClick={() => void run(() => ungroupAll(windowId as number))}
+            onClick={() => setConfirmUngroupAll(true)}
           >
             Desagrupar tudo
           </button>
         </div>
+
+        {confirmUngroupAll && (
+          <div className="confirm">
+            <span className="confirm__text">
+              Desagrupar todos os {groups.length} grupos desta janela?
+            </span>
+            <button
+              type="button"
+              className="btn"
+              disabled={busy}
+              onClick={() => setConfirmUngroupAll(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn--danger-solid"
+              disabled={busy || windowId == null}
+              onClick={() => {
+                setConfirmUngroupAll(false)
+                void run(() => ungroupAll(windowId as number))
+              }}
+            >
+              Desagrupar
+            </button>
+          </div>
+        )}
       </header>
 
       {selectedIds.length > 0 && (
@@ -273,21 +306,36 @@ export default function App() {
         {sections.map((section) => {
           const ids = section.tabs.map((tab) => tab.id)
           const allSelected = ids.every((id) => selected.has(id))
+          const isPinned = section.key === 'pinned'
+          // Grupos reais seguem o estado do Chrome; com filtro ativo, tudo aberto
+          // para nao esconder resultados. Recolhido abre no hover (ver popup.css).
+          const collapsed = filtering
+            ? false
+            : isPinned
+              ? pinnedCollapsed
+              : (section.group?.collapsed ?? false)
 
           return (
-            <section className="group" key={section.group?.id ?? 'ungrouped'}>
+            <section
+              className={collapsed ? 'group group--collapsed' : 'group'}
+              key={section.key}
+            >
               <GroupHeader
                 group={section.group}
+                label={section.label}
                 count={section.tabs.length}
+                collapsed={collapsed}
                 allSelected={allSelected}
                 onSelectAll={(shouldSelect) => selectMany(ids, shouldSelect)}
                 onToggleCollapse={
-                  section.group
-                    ? () =>
-                        void run(() =>
-                          updateGroup(section.group!.id, { collapsed: !section.group!.collapsed }),
-                        )
-                    : undefined
+                  isPinned
+                    ? () => setPinnedCollapsed((value) => !value)
+                    : section.group
+                      ? () =>
+                          void run(() =>
+                            updateGroup(section.group!.id, { collapsed: !section.group!.collapsed }),
+                          )
+                      : undefined
                 }
                 onRename={
                   section.group
@@ -314,12 +362,7 @@ export default function App() {
                     tab={tab}
                     selected={selected.has(tab.id)}
                     onToggle={toggleTab}
-                    onActivate={(id) => void activateTab(id).then(() => window.close())}
                     onClose={(id) => void run(() => closeTabs([id]))}
-                    onTogglePin={(target) =>
-                      void run(() => setTabPinned(target.id, !target.pinned))
-                    }
-                    onToggleMute={(target) => void run(() => setTabMuted(target.id, !target.muted))}
                   />
                 ))}
               </ul>
@@ -329,7 +372,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span>Clique = ir para a aba · Ctrl/Shift+clique = selecionar</span>
+        <span>Clique = selecionar · Shift+clique = selecionar intervalo</span>
         <div className="footer__spacer" />
         <button type="button" className="link" onClick={openOptions}>
           Configuracoes

@@ -1,10 +1,19 @@
-import { getDomain, getGroupLabel, groupBy, hashString } from './domain'
+import {
+  domainMatches,
+  getDomain,
+  getGroupLabel,
+  groupBy,
+  hashString,
+  isSiteDomain,
+  sameLabel,
+} from './domain'
 import { getSettings } from './storage'
 import {
   GROUP_COLORS,
   UNGROUPED,
   type GroupColor,
   type GroupInfo,
+  type GroupPreset,
   type Settings,
   type TabInfo,
 } from './types'
@@ -94,10 +103,19 @@ export async function groupTabs(
   const ids = nonEmpty(tabIds)
   if (!ids) return null
 
-  const groupId = await chrome.tabs.group({
-    tabIds: ids,
-    ...(windowId == null ? {} : { createProperties: { windowId } }),
-  })
+  let groupId: number
+  try {
+    groupId = await chrome.tabs.group({
+      tabIds: ids,
+      ...(windowId == null ? {} : { createProperties: { windowId } }),
+    })
+  } catch (error) {
+    // O Chrome recusa createProperties em algumas situacoes (aba ainda carregando,
+    // janela em transicao). Sem windowId o grupo nasce na janela das proprias abas.
+    console.warn('[tab-group] tabs.group com windowId falhou, tentando sem:', error)
+    groupId = await chrome.tabs.group({ tabIds: ids })
+  }
+
   await chrome.tabGroups.update(groupId, { title, color, collapsed })
   return groupId
 }
@@ -134,9 +152,25 @@ export async function ungroupAll(windowId: number): Promise<void> {
   await ungroupTabs(grouped)
 }
 
-export async function collapseAll(windowId: number, collapsed: boolean): Promise<void> {
+/**
+ * Recolhe/expande todos os grupos da janela. Cada grupo e tratado isoladamente:
+ * o Chrome recusa recolher o grupo que contem a aba ativa, e isso nao deve
+ * impedir que os outros sejam recolhidos.
+ */
+export async function collapseAll(windowId: number, collapsed: boolean): Promise<number> {
   const groups = await chrome.tabGroups.query({ windowId })
-  await Promise.all(groups.map((group) => chrome.tabGroups.update(group.id, { collapsed })))
+  const results = await Promise.all(
+    groups.map((group) =>
+      chrome.tabGroups
+        .update(group.id, { collapsed })
+        .then(() => true)
+        .catch((error) => {
+          console.warn('[tab-group] grupo', group.id, 'nao pode ser alterado:', error)
+          return false
+        }),
+    ),
+  )
+  return results.filter(Boolean).length
 }
 
 /** Recolhe todos os grupos menos o da aba ativa — util para focar no que importa. */
@@ -176,12 +210,12 @@ export async function groupByDomain(
   const result: GroupByDomainResult = { createdGroups: 0, groupedTabs: 0 }
 
   for (const [domain, domainTabs] of groupBy(tabs, (tab) => tab.domain)) {
-    if (settings.ignoredDomains.includes(domain)) continue
+    if (settings.ignoredDomains.some((entry) => domainMatches(domain, entry))) continue
     if (domainTabs.length < Math.max(1, settings.minTabsPerGroup)) continue
 
     const label = getGroupLabel(domain)
     const color = settings.colorizeByDomain ? colorForDomain(domain) : settings.defaultColor
-    const target = existing.find((group) => group.title === label)
+    const target = existing.find((group) => sameLabel(group.title, label))
     const tabIds = domainTabs
       .filter((tab) => tab.groupId !== (target?.id ?? UNGROUPED))
       .map((tab) => tab.id)
@@ -205,39 +239,94 @@ export async function groupByDomain(
   return result
 }
 
+/** Predefinicao que cobre o dominio (subdominios e portas seguem `domainMatches`). */
+export function matchPreset(domain: string, presets: GroupPreset[]): GroupPreset | undefined {
+  return presets.find((preset) => preset.domains.some((entry) => domainMatches(domain, entry)))
+}
+
+/** Grupo da janela cujo nome bate com o rotulo, ignorando caixa. */
+async function findGroupByLabel(windowId: number, label: string): Promise<number | null> {
+  const groups = await chrome.tabGroups.query({ windowId })
+  return groups.find((group) => sameLabel(group.title ?? '', label))?.id ?? null
+}
+
 /**
- * Coloca uma aba recem-aberta no grupo do seu dominio, se ja existir um.
- * Nao cria grupos novos: so encaixa a aba onde ela pertence.
+ * Coloca uma aba recem-aberta no grupo certo, conforme o modo configurado.
+ * No modo "dominio" nao cria grupo com uma aba so; no modo "predefinicao" cria.
+ * Devolve uma descricao da decisao (util para depurar no console do worker).
  */
-export async function autoGroupTab(tab: chrome.tabs.Tab): Promise<void> {
+export async function autoGroupTab(tab: chrome.tabs.Tab): Promise<string> {
   const settings = await getSettings()
-  if (!settings.autoGroupNewTabs) return
-  if (tab.id == null || tab.pinned) return
-  if (tab.groupId != null && tab.groupId !== UNGROUPED) return
+  if (!settings.autoGroupNewTabs) return 'agrupamento automatico desligado'
+  if (tab.id == null || tab.pinned) return 'aba fixada ou sem id'
+  if (tab.groupId != null && tab.groupId !== UNGROUPED) return 'aba ja esta em um grupo'
 
   const domain = getDomain(tab.url || tab.pendingUrl)
-  if (settings.ignoredDomains.includes(domain) || domain === 'outros') return
-
-  const label = getGroupLabel(domain)
-  const groups = await chrome.tabGroups.query({ windowId: tab.windowId, title: label })
-  if (groups.length > 0) {
-    await addTabsToGroup([tab.id], groups[0]!.id)
-    return
+  // Nova aba, chrome://, file:// e afins nao viram grupo: sem isso toda pagina
+  // interna cairia no mesmo grupo e a aba ficaria presa nele ao navegar depois.
+  if (!isSiteDomain(domain)) return `pagina interna (${domain}) nao e agrupada`
+  if (settings.ignoredDomains.some((entry) => domainMatches(domain, entry))) {
+    return `${domain} esta na lista de ignorados`
   }
 
-  // Sem grupo pronto: cria um se ja houver outras abas do mesmo dominio soltas.
-  const siblings = (await listTabs(tab.windowId)).filter(
-    (other) => other.domain === domain && !other.pinned && other.groupId === UNGROUPED,
-  )
-  if (siblings.length < Math.max(2, settings.minTabsPerGroup)) return
+  const minimum = Math.max(1, settings.minTabsPerGroup)
+  const openTabs = await listTabs(tab.windowId)
+  const isLoose = (other: TabInfo) => !other.pinned && other.groupId === UNGROUPED
 
-  await groupTabs(
+  if (settings.autoGroupMode === 'preset') {
+    const preset = matchPreset(domain, settings.presets)
+    if (!preset || !preset.title.trim()) {
+      return `modo predefinicao: nenhuma predefinicao cobre ${domain}`
+    }
+
+    const label = preset.title.trim()
+    const existingId = await findGroupByLabel(tab.windowId, label)
+    if (existingId != null) {
+      await addTabsToGroup([tab.id], existingId)
+      return `modo predefinicao: ${domain} entrou no grupo "${label}"`
+    }
+
+    // Sem grupo pronto: junta todas as abas soltas cobertas pela mesma predefinicao.
+    const siblings = openTabs.filter(
+      (other) => isLoose(other) && matchPreset(other.domain, settings.presets)?.id === preset.id,
+    )
+    if (siblings.length < minimum) {
+      return `modo predefinicao: so ${siblings.length} aba(s) de "${label}" soltas (minimo ${minimum})`
+    }
+
+    const created = await groupTabs(
+      siblings.map((other) => other.id),
+      { title: label, color: preset.color, collapsed: settings.collapseNewGroups, windowId: tab.windowId },
+    )
+    return created == null
+      ? `modo predefinicao: falhou ao criar o grupo "${label}"`
+      : `modo predefinicao: criou o grupo "${label}" com ${siblings.length} aba(s)`
+  }
+
+  const label = getGroupLabel(domain)
+  // Busca sem diferenciar maiusculas: um grupo "YouTube" criado a mao tambem serve.
+  const existingId = await findGroupByLabel(tab.windowId, label)
+  if (existingId != null) {
+    await addTabsToGroup([tab.id], existingId)
+    return `modo dominio: ${domain} entrou no grupo "${label}"`
+  }
+
+  // Sem grupo pronto: cria um se ja houver abas suficientes do mesmo dominio soltas.
+  const siblings = openTabs.filter((other) => isLoose(other) && other.domain === domain)
+  if (siblings.length < minimum) {
+    return `modo dominio: so ${siblings.length} aba(s) de ${domain} soltas (minimo ${minimum})`
+  }
+
+  const created = await groupTabs(
     siblings.map((other) => other.id),
     {
       title: label,
       color: settings.colorizeByDomain ? colorForDomain(domain) : settings.defaultColor,
-      collapsed: false,
+      collapsed: settings.collapseNewGroups,
       windowId: tab.windowId,
     },
   )
+  return created == null
+    ? `modo dominio: falhou ao criar o grupo "${label}"`
+    : `modo dominio: criou o grupo "${label}" com ${siblings.length} aba(s)`
 }

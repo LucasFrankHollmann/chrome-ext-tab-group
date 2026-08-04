@@ -60,21 +60,10 @@ interface TabRowProps {
   tab: TabInfo
   selected: boolean
   onToggle: (tabId: number, shiftKey: boolean) => void
-  onActivate: (tabId: number) => void
   onClose: (tabId: number) => void
-  onTogglePin: (tab: TabInfo) => void
-  onToggleMute: (tab: TabInfo) => void
 }
 
-export function TabRow({
-  tab,
-  selected,
-  onToggle,
-  onActivate,
-  onClose,
-  onTogglePin,
-  onToggleMute,
-}: TabRowProps) {
+export function TabRow({ tab, selected, onToggle, onClose }: TabRowProps) {
   const className = [
     'tab',
     tab.active && 'tab--active',
@@ -86,10 +75,7 @@ export function TabRow({
   return (
     <li
       className={className}
-      onClick={(event) => {
-        if (event.shiftKey || event.ctrlKey || event.metaKey) onToggle(tab.id, event.shiftKey)
-        else onActivate(tab.id)
-      }}
+      onClick={(event) => onToggle(tab.id, event.shiftKey)}
       title={tab.url}
     >
       <input
@@ -107,35 +93,7 @@ export function TabRow({
         <div className="tab__title">{tab.title}</div>
         <div className="tab__domain">{tab.domain}</div>
       </div>
-      <div className="tab__badges">
-        {tab.pinned && <span title="Fixada">📌</span>}
-        {tab.discarded && <span title="Suspensa">💤</span>}
-      </div>
       <div className="tab__actions">
-        {(tab.audible || tab.muted) && (
-          <button
-            type="button"
-            className="btn btn--icon"
-            title={tab.muted ? 'Reativar som' : 'Silenciar'}
-            onClick={(event) => {
-              event.stopPropagation()
-              onToggleMute(tab)
-            }}
-          >
-            {tab.muted ? '🔇' : '🔊'}
-          </button>
-        )}
-        <button
-          type="button"
-          className="btn btn--icon"
-          title={tab.pinned ? 'Desafixar' : 'Fixar'}
-          onClick={(event) => {
-            event.stopPropagation()
-            onTogglePin(tab)
-          }}
-        >
-          📌
-        </button>
         <button
           type="button"
           className="btn btn--icon"
@@ -154,7 +112,10 @@ export function TabRow({
 
 interface GroupHeaderProps {
   group: GroupInfo | null
+  /** Titulo das secoes virtuais (fixadas / sem grupo). */
+  label?: string
   count: number
+  collapsed?: boolean
   allSelected: boolean
   onSelectAll: (selected: boolean) => void
   onToggleCollapse?: () => void
@@ -166,7 +127,9 @@ interface GroupHeaderProps {
 
 export function GroupHeader({
   group,
+  label,
   count,
+  collapsed,
   allSelected,
   onSelectAll,
   onToggleCollapse,
@@ -177,6 +140,7 @@ export function GroupHeader({
 }: GroupHeaderProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(group?.title ?? '')
+  const isCollapsed = collapsed ?? group?.collapsed ?? false
 
   const commit = () => {
     setEditing(false)
@@ -189,9 +153,23 @@ export function GroupHeader({
         type="checkbox"
         className="tab__checkbox"
         checked={allSelected}
-        aria-label={group ? `Selecionar grupo ${group.title}` : 'Selecionar abas sem grupo'}
+        aria-label={
+          group ? `Selecionar grupo ${group.title}` : `Selecionar ${label ?? 'abas sem grupo'}`
+        }
         onChange={(event) => onSelectAll(event.target.checked)}
       />
+      {onToggleCollapse && (
+        <button
+          type="button"
+          className="btn btn--icon group__caret"
+          title={isCollapsed ? 'Expandir' : 'Recolher'}
+          aria-expanded={!isCollapsed}
+          onClick={onToggleCollapse}
+        >
+          {isCollapsed ? '▸' : '▾'}
+        </button>
+      )}
+
       {group ? (
         <span className="group__dot" style={{ background: GROUP_COLOR_HEX[group.color] }} />
       ) : (
@@ -215,7 +193,7 @@ export function GroupHeader({
         />
       ) : (
         <span className="group__title">
-          {group ? group.title || '(sem nome)' : 'Sem grupo'}
+          {group ? group.title || '(sem nome)' : (label ?? 'Sem grupo')}
         </span>
       )}
 
@@ -246,16 +224,6 @@ export function GroupHeader({
             }}
           >
             ✎
-          </button>
-        )}
-        {group && onToggleCollapse && (
-          <button
-            type="button"
-            className="btn btn--icon"
-            title={group.collapsed ? 'Expandir' : 'Recolher'}
-            onClick={onToggleCollapse}
-          >
-            {group.collapsed ? '▸' : '▾'}
           </button>
         )}
         {onUngroup && (

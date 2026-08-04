@@ -43,20 +43,20 @@ Não há `host_permissions` nem content scripts: a extensão não lê o conteúd
 **Popup**
 - Lista as abas da janela atual separadas por grupo (e "Sem grupo")
 - Filtro por título, URL ou domínio
-- Clique = ir para a aba · `Ctrl`/`Shift`+clique = selecionar (Shift seleciona intervalo)
+- Clique = selecionar a aba (`Shift`+clique seleciona intervalo)
 - Com abas selecionadas: criar grupo com nome + cor, desagrupar ou fechar em lote
 - Por grupo: renomear inline, trocar cor, recolher/expandir, desagrupar, fechar tudo
-- Por aba: fixar, silenciar, fechar
-- Botões globais: agrupar por domínio, recolher/expandir tudo, desagrupar tudo
+- Por aba: fechar
+- Botões globais: recolher/expandir tudo, desagrupar tudo (com confirmação)
 - Atualiza sozinho quando abas/grupos mudam fora do popup
 
 **Background (service worker)**
-- Atalhos: `Alt+Shift+G` agrupar por domínio, `Alt+Shift+U` desagrupar tudo, e "recolher os outros grupos" (sem atalho padrão)
-- Menu de contexto com as mesmas ações
+- Menu de contexto: agrupar por domínio, desagrupar tudo, recolher/expandir grupos
 - Agrupamento automático de abas novas pelo domínio (desligado por padrão)
 
 **Opções**
-- Ligar/desligar agrupamento automático, cor por domínio e recolher grupos novos
+- Agrupamento automático com dois modos exclusivos: **por domínio** (procura um grupo cujo *nome* seja o do domínio) ou **por predefinição** (você define nome do grupo + domínios que entram nele)
+- Cor por domínio e recolher grupos recém-criados
 - Mínimo de abas por grupo, cor padrão e lista de domínios ignorados
 
 ## Estrutura
