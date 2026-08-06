@@ -14,28 +14,28 @@ const SECOND_LEVEL_SUFFIXES = new Set([
 /**
  * Host normalizado da URL, sem "www." e com a porta quando ela for explicita
  * ("localhost:3000") — assim dois servidores locais nao viram o mesmo grupo.
- * Paginas internas viram "navegador", "extensoes", etc.
+ * Paginas internas viram "browser", "extensions", etc.
  */
 export function getDomain(url: string | undefined): string {
-  if (!url) return 'outros'
+  if (!url) return 'other'
   try {
     const parsed = new URL(url)
     switch (parsed.protocol) {
       case 'chrome:':
       case 'edge:':
       case 'about:':
-        return 'navegador'
+        return 'browser'
       case 'chrome-extension:':
       case 'moz-extension:':
-        return 'extensoes'
+        return 'extensions'
       case 'file:':
-        return 'arquivos'
+        return 'files'
     }
     const host = parsed.hostname.replace(/^www\./, '')
-    if (!host) return 'outros'
+    if (!host) return 'other'
     return parsed.port ? `${host}:${parsed.port}` : host
   } catch {
-    return 'outros'
+    return 'other'
   }
 }
 
@@ -66,7 +66,7 @@ export function domainMatches(domain: string, entry: string): boolean {
 }
 
 /** Pseudo-dominios de paginas internas: nao representam um site de verdade. */
-const NON_SITE_DOMAINS = new Set(['outros', 'navegador', 'extensoes', 'arquivos'])
+const NON_SITE_DOMAINS = new Set(['other', 'browser', 'extensions', 'files'])
 
 /**
  * Paginas internas (chrome://, nova aba, extensoes, file://) e URLs vazias nao

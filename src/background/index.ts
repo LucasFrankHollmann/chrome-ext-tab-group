@@ -22,12 +22,12 @@ function createMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU.groupByDomain,
-      title: 'Agrupar abas por dominio',
+      title: 'Group tabs by site',
       contexts: ['action', 'page'],
     })
     chrome.contextMenus.create({
       id: MENU.ungroupAll,
-      title: 'Desagrupar todas as abas',
+      title: 'Ungroup all tabs',
       contexts: ['action', 'page'],
     })
     chrome.contextMenus.create({
@@ -37,12 +37,12 @@ function createMenus() {
     })
     chrome.contextMenus.create({
       id: MENU.collapseAll,
-      title: 'Recolher todos os grupos',
+      title: 'Collapse all groups',
       contexts: ['action', 'page'],
     })
     chrome.contextMenus.create({
       id: MENU.expandAll,
-      title: 'Expandir todos os grupos',
+      title: 'Expand all groups',
       contexts: ['action', 'page'],
     })
   })

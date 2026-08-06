@@ -86,7 +86,7 @@ export default function App() {
     result.sort((a, b) => (a.tabs[0]?.index ?? 0) - (b.tabs[0]?.index ?? 0))
 
     if (pinned.length) {
-      result.unshift({ key: 'pinned', group: null, label: 'Fixadas', tabs: pinned })
+      result.unshift({ key: 'pinned', group: null, label: 'Pinned', tabs: pinned })
     }
 
     return result
@@ -149,7 +149,7 @@ export default function App() {
   const createGroup = useCallback(() => {
     if (selectedIds.length === 0) return
     const fallback = tabs.find((tab) => tab.id === selectedIds[0])
-    const title = newGroupName.trim() || getGroupLabel(fallback?.domain ?? 'Grupo')
+    const title = newGroupName.trim() || getGroupLabel(fallback?.domain ?? 'Group')
 
     void run(
       () =>
@@ -182,16 +182,16 @@ export default function App() {
     <>
       <header className="header">
         <div className="header__top">
-          <h1 className="header__title">Tab Group</h1>
+          <h1 className="header__title">Tytab</h1>
           <span className="header__count">
-            {tabs.length} abas · {groups.length} grupos
+            {tabs.length} tabs · {groups.length} groups
           </span>
         </div>
 
         <input
           type="search"
           className="search"
-          placeholder="Filtrar por titulo, URL ou dominio…"
+          placeholder="Filter by title, URL, or site…"
           value={query}
           autoFocus
           onChange={(event) => setQuery(event.target.value)}
@@ -204,7 +204,7 @@ export default function App() {
             disabled={busy || windowId == null}
             onClick={() => void run(() => collapseAll(windowId as number, true))}
           >
-            Recolher
+            Collapse
           </button>
           <button
             type="button"
@@ -212,7 +212,7 @@ export default function App() {
             disabled={busy || windowId == null}
             onClick={() => void run(() => collapseAll(windowId as number, false))}
           >
-            Expandir
+            Expand
           </button>
           <button
             type="button"
@@ -220,14 +220,14 @@ export default function App() {
             disabled={busy || windowId == null || groups.length === 0}
             onClick={() => setConfirmUngroupAll(true)}
           >
-            Desagrupar tudo
+            Ungroup all
           </button>
         </div>
 
         {confirmUngroupAll && (
           <div className="confirm">
             <span className="confirm__text">
-              Desagrupar todos os {groups.length} grupos desta janela?
+              Ungroup all {groups.length} groups in this window?
             </span>
             <button
               type="button"
@@ -235,7 +235,7 @@ export default function App() {
               disabled={busy}
               onClick={() => setConfirmUngroupAll(false)}
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"
@@ -246,7 +246,7 @@ export default function App() {
                 void run(() => ungroupAll(windowId as number))
               }}
             >
-              Desagrupar
+              Ungroup
             </button>
           </div>
         )}
@@ -254,15 +254,15 @@ export default function App() {
 
       {selectedIds.length > 0 && (
         <div className="selection-bar">
-          <span className="selection-bar__label">{selectedIds.length} selecionadas</span>
+          <span className="selection-bar__label">{selectedIds.length} selected</span>
           <button type="button" className="link" onClick={() => setSelected(new Set())}>
-            limpar
+            clear
           </button>
 
           <div className="group-form">
             <input
               type="text"
-              placeholder="Nome do novo grupo"
+              placeholder="New group name"
               value={newGroupName}
               onChange={(event) => setNewGroupName(event.target.value)}
               onKeyDown={(event) => {
@@ -270,7 +270,7 @@ export default function App() {
               }}
             />
             <button type="button" className="btn btn--primary" disabled={busy} onClick={createGroup}>
-              Agrupar
+              Group
             </button>
           </div>
 
@@ -284,7 +284,7 @@ export default function App() {
             disabled={busy}
             onClick={() => void run(() => ungroupTabs(selectedIds), { clearSelection: true })}
           >
-            Desagrupar
+            Ungroup
           </button>
           <button
             type="button"
@@ -292,15 +292,15 @@ export default function App() {
             disabled={busy}
             onClick={() => void run(() => closeTabs(selectedIds), { clearSelection: true })}
           >
-            Fechar
+            Close
           </button>
         </div>
       )}
 
       <main className="content">
-        {loading && <div className="empty">Carregando abas…</div>}
+        {loading && <div className="empty">Loading tabs…</div>}
         {!loading && sections.length === 0 && (
-          <div className="empty">Nenhuma aba corresponde ao filtro.</div>
+          <div className="empty">No tabs match the filter.</div>
         )}
 
         {sections.map((section) => {
@@ -372,10 +372,10 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span>Clique = selecionar · Shift+clique = selecionar intervalo</span>
+        <span>Click = select · Shift+click = select range</span>
         <div className="footer__spacer" />
         <button type="button" className="link" onClick={openOptions}>
-          Configuracoes
+          Settings
         </button>
       </footer>
     </>

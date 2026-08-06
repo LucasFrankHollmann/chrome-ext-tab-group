@@ -42,7 +42,7 @@ export function ColorPicker({
   const dark = useDarkMode()
 
   return (
-    <div className="color-select" role="group" aria-label="Cor do grupo">
+    <div className="color-select" role="group" aria-label="Group color">
       {GROUP_COLORS.map((color) => (
         <button
           key={color}
@@ -85,7 +85,7 @@ export function TabRow({ tab, selected, onToggle, onClose }: TabRowProps) {
         type="checkbox"
         className="tab__checkbox"
         checked={selected}
-        aria-label={`Selecionar ${tab.title}`}
+        aria-label={`Select ${tab.title}`}
         onClick={(event) => event.stopPropagation()}
         onChange={(event) =>
           onToggle(tab.id, (event.nativeEvent as MouseEvent).shiftKey ?? false)
@@ -100,7 +100,7 @@ export function TabRow({ tab, selected, onToggle, onClose }: TabRowProps) {
         <button
           type="button"
           className="btn btn--icon"
-          title="Fechar aba"
+          title="Close tab"
           onClick={(event) => {
             event.stopPropagation()
             onClose(tab.id)
@@ -158,7 +158,7 @@ export function GroupHeader({
         className="tab__checkbox"
         checked={allSelected}
         aria-label={
-          group ? `Selecionar grupo ${group.title}` : `Selecionar ${label ?? 'abas sem grupo'}`
+          group ? `Select group ${group.title}` : `Select ${label ?? 'ungrouped tabs'}`
         }
         onChange={(event) => onSelectAll(event.target.checked)}
       />
@@ -166,7 +166,7 @@ export function GroupHeader({
         <button
           type="button"
           className="btn btn--icon group__caret"
-          title={isCollapsed ? 'Expandir' : 'Recolher'}
+          title={isCollapsed ? 'Expand' : 'Collapse'}
           aria-expanded={!isCollapsed}
           onClick={onToggleCollapse}
         >
@@ -197,7 +197,7 @@ export function GroupHeader({
         />
       ) : (
         <span className="group__title">
-          {group ? group.title || '(sem nome)' : (label ?? 'Sem grupo')}
+          {group ? group.title || '(unnamed)' : (label ?? 'Ungrouped')}
         </span>
       )}
 
@@ -207,7 +207,7 @@ export function GroupHeader({
         {group && onRecolor && (
           <select
             value={group.color}
-            aria-label="Cor do grupo"
+            aria-label="Group color"
             onChange={(event) => onRecolor(event.target.value as GroupColor)}
           >
             {GROUP_COLORS.map((color) => (
@@ -221,7 +221,7 @@ export function GroupHeader({
           <button
             type="button"
             className="btn btn--icon"
-            title="Renomear grupo"
+            title="Rename group"
             onClick={() => {
               setDraft(group.title)
               setEditing(true)
@@ -231,7 +231,7 @@ export function GroupHeader({
           </button>
         )}
         {onUngroup && (
-          <button type="button" className="btn btn--icon" title="Desagrupar" onClick={onUngroup}>
+          <button type="button" className="btn btn--icon" title="Ungroup" onClick={onUngroup}>
             ⤨
           </button>
         )}
@@ -239,7 +239,7 @@ export function GroupHeader({
           <button
             type="button"
             className="btn btn--icon btn--danger"
-            title="Fechar todas as abas do grupo"
+            title="Close all tabs in group"
             onClick={onCloseGroup}
           >
             ✕

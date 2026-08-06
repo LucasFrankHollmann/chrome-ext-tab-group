@@ -13,17 +13,17 @@ export const GROUP_COLORS: GroupColor[] = [
   'orange',
 ]
 
-/** Rotulos em pt-BR para as cores nativas do Chrome. */
+/** Rotulos das cores nativas do Chrome, como o navegador as chama. */
 export const GROUP_COLOR_LABELS: Record<GroupColor, string> = {
-  grey: 'Cinza',
-  blue: 'Azul',
-  red: 'Vermelho',
-  yellow: 'Amarelo',
-  green: 'Verde',
-  pink: 'Rosa',
-  purple: 'Roxo',
-  cyan: 'Ciano',
-  orange: 'Laranja',
+  grey: 'Grey',
+  blue: 'Blue',
+  red: 'Red',
+  yellow: 'Yellow',
+  green: 'Green',
+  pink: 'Pink',
+  purple: 'Purple',
+  cyan: 'Cyan',
+  orange: 'Orange',
 }
 
 /**

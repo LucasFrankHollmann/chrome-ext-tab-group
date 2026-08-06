@@ -1,4 +1,4 @@
-# Tab Group
+# Tytab
 
 Extensão Chrome (Manifest V3) para organizar abas em grupos, feita com **React 19 + TypeScript + Vite 7**.
 

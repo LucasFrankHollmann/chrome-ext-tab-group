@@ -32,7 +32,7 @@ export function toTabInfo(tab: chrome.tabs.Tab): TabInfo {
     id: tab.id ?? -1,
     windowId: tab.windowId,
     index: tab.index,
-    title: tab.title?.trim() || url || 'Sem titulo',
+    title: tab.title?.trim() || url || 'Untitled',
     url,
     domain: getDomain(url),
     favIconUrl: tab.favIconUrl,
