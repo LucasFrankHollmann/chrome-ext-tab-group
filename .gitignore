@@ -5,3 +5,6 @@ dist/
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# pacotes gerados para a loja
+*.zip

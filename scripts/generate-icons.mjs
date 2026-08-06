@@ -5,7 +5,9 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const OUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons')
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const OUT_DIR = resolve(ROOT, 'public', 'icons')
+const STORE_DIR = resolve(ROOT, 'store')
 const SIZES = [16, 32, 48, 128]
 
 const BG = [37, 99, 235] // azul
@@ -93,15 +95,22 @@ function blend(base, layer, alpha) {
   return base.map((c, i) => Math.round(c * (1 - alpha) + layer[i] * alpha))
 }
 
-function drawIcon(size) {
-  const u = size / 16 // unidade de grade (icone desenhado em 16x16)
-  const card = { left: 0.6 * u, top: 0.6 * u, right: 15.4 * u, bottom: 15.4 * u, radius: 3.4 * u }
+/**
+ * @param size lado do PNG.
+ * @param pad borda transparente em volta da arte, em pixels. Os icones da barra
+ *   preenchem o quadro (pad 0); o da loja precisa de 16px de folga de cada lado
+ *   (arte 96x96 em 128x128), conforme developer.chrome.com/docs/webstore/images.
+ */
+function drawIcon(size, pad = 0) {
+  const u = (size - pad * 2) / 16 // unidade de grade (icone desenhado em 16x16)
+  const at = (n) => pad + n * u
+  const card = { left: at(0.6), top: at(0.6), right: at(15.4), bottom: at(15.4), radius: 3.4 * u }
 
   const tabs = [
-    { left: 2.4 * u, top: 3.4 * u, right: 6.4 * u, bottom: 6.2 * u, radius: 1 * u },
-    { left: 7.4 * u, top: 3.4 * u, right: 13.6 * u, bottom: 6.2 * u, radius: 1 * u },
-    { left: 2.4 * u, top: 7.4 * u, right: 13.6 * u, bottom: 10.2 * u, radius: 1 * u },
-    { left: 2.4 * u, top: 11.4 * u, right: 9.4 * u, bottom: 14.2 * u, radius: 1 * u },
+    { left: at(2.4), top: at(3.4), right: at(6.4), bottom: at(6.2), radius: u },
+    { left: at(7.4), top: at(3.4), right: at(13.6), bottom: at(6.2), radius: u },
+    { left: at(2.4), top: at(7.4), right: at(13.6), bottom: at(10.2), radius: u },
+    { left: at(2.4), top: at(11.4), right: at(9.4), bottom: at(14.2), radius: u },
   ]
 
   return encodePng(size, (x, y) => {
@@ -127,3 +136,18 @@ for (const size of SIZES) {
   writeFileSync(file, drawIcon(size))
   console.log(`icone gerado: ${file}`)
 }
+
+// Icone da ficha da loja: mesma arte, com a folga que o Google pede (arte 96x96
+// em 128x128). Fica fora de public/ porque nao entra no pacote da extensao, e sim
+// no formulario da loja.
+//
+// A folga sai de conta, nao de chute: o cartao ocupa 14.8 das 16 unidades da
+// grade, entao para o cartao medir 96px a grade inteira precisa de 16*(96/14.8).
+const STORE_ART = 96
+const CARD_UNITS = 15.4 - 0.6
+const storePad = Math.round((128 - 16 * (STORE_ART / CARD_UNITS)) / 2)
+
+mkdirSync(STORE_DIR, { recursive: true })
+const storeIcon = resolve(STORE_DIR, 'icon-128.png')
+writeFileSync(storeIcon, drawIcon(128, storePad))
+console.log(`icone da loja gerado: ${storeIcon} (folga ${storePad}px, arte ~${STORE_ART}px)`)
