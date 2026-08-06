@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getSettings, resetSettings, saveSettings } from '@/lib/storage'
 import { listGroups } from '@/lib/tabs'
+import { hasRenameAccess, RENAME_ORIGINS } from '@/lib/titles'
 import { useDarkMode } from '@/lib/useDarkMode'
 import {
   GROUP_COLORS,
@@ -18,8 +19,8 @@ import './options.css'
 const SAVED_MESSAGE_MS = 1600
 
 const TABS = [
-  { id: 'grouping', label: 'Agrupamento' },
-  { id: 'rename', label: 'Renomear abas' },
+  { id: 'grouping', label: 'Grouping' },
+  { id: 'rename', label: 'Rename tabs' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -52,6 +53,7 @@ export default function Options() {
   const [presetDrafts, setPresetDrafts] = useState<PresetDraft[]>([])
   const [ruleDrafts, setRuleDrafts] = useState<TitleRule[]>([])
   const [openGroups, setOpenGroups] = useState<GroupInfo[]>([])
+  const [renameAccess, setRenameAccess] = useState(false)
   const dark = useDarkMode()
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function Options() {
     // Os grupos de verdade, de todas as janelas: e por eles que o usuario procura
     // a configuracao, nao pela predefinicao que talvez nem exista.
     void listGroups().then(setOpenGroups)
+    void hasRenameAccess().then(setRenameAccess)
   }, [])
 
   useEffect(() => {
@@ -128,6 +131,29 @@ export default function Options() {
   const addRule = () =>
     commitRules([...ruleDrafts, { id: crypto.randomUUID(), pattern: '', title: '', enabled: true }])
 
+  /**
+   * Liga/desliga a renomeacao. O acesso aos sites e opcional no manifest, entao
+   * ligar pede a permissao na hora — `chrome.permissions.request` so funciona
+   * dentro do clique, por isso nada de await antes dele. Recusar deixa a opcao
+   * desligada; desligar devolve a permissao, para nao ficar acesso sobrando.
+   */
+  const toggleRename = async (enabled: boolean) => {
+    if (!enabled) {
+      await update({ renameTabs: false })
+      await chrome.permissions.remove({ origins: RENAME_ORIGINS }).catch(() => false)
+      setRenameAccess(await hasRenameAccess())
+      return
+    }
+
+    const granted = await chrome.permissions.request({ origins: RENAME_ORIGINS })
+    setRenameAccess(granted)
+    if (granted) await update({ renameTabs: true })
+  }
+
+  const requestRenameAccess = async () => {
+    setRenameAccess(await chrome.permissions.request({ origins: RENAME_ORIGINS }))
+  }
+
   /** Grupos abertos + nomes de predefinicao, sem repetir o mesmo nome. */
   const groupRows = [
     ...openGroups.map((group) => ({ title: group.title, color: group.color })),
@@ -158,11 +184,11 @@ export default function Options() {
   return (
     <main className="page">
       <header className="page__header">
-        <h1>Tab Group</h1>
-        <p className="muted">Configuracoes de agrupamento de abas.</p>
+        <h1>Tytab</h1>
+        <p className="muted">Tab grouping settings.</p>
       </header>
 
-      <nav className="tabs" role="tablist" aria-label="Secoes das configuracoes">
+      <nav className="tabs" role="tablist" aria-label="Settings sections">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -180,7 +206,7 @@ export default function Options() {
       {tab === 'grouping' && (
         <>
           <section className="card">
-            <h2>Agrupamento automatico</h2>
+            <h2>Automatic grouping</h2>
 
             <label className="row">
               <input
@@ -189,10 +215,10 @@ export default function Options() {
                 onChange={(event) => void update({ autoGroupNewTabs: event.target.checked })}
               />
               <span>
-                <strong>Agrupar abas novas automaticamente</strong>
+                <strong>Group new tabs automatically</strong>
                 <small>
-                  Quando uma aba nova termina de carregar, ela entra sozinha em um grupo. Paginas
-                  internas (nova aba, chrome://, arquivos locais) nunca sao agrupadas.
+                  When a new tab finishes loading, it joins a group on its own. Internal pages (new
+                  tab, chrome://, local files) are never grouped.
                 </small>
               </span>
             </label>
@@ -207,12 +233,12 @@ export default function Options() {
                     onChange={() => void update({ autoGroupMode: 'domain' })}
                   />
                   <span>
-                    <strong>Por dominio</strong>
+                    <strong>By site</strong>
                     <small>
-                      O grupo e escolhido <strong>pelo nome</strong>: uma aba de "docs.youtube.com"
-                      procura um grupo chamado "youtube" (a caixa nao importa). Se nenhum grupo
-                      tiver esse nome, um novo e criado quando houver abas soltas suficientes do
-                      mesmo dominio. Renomear o grupo faz as proximas abas deixarem de encontra-lo.
+                      The group is picked <strong>by name</strong>: a tab on "docs.youtube.com"
+                      looks for a group named "youtube" (case does not matter). If no group has
+                      that name, a new one is created once there are enough loose tabs from the
+                      same site. Renaming the group stops the next tabs from finding it.
                     </small>
                   </span>
                 </label>
@@ -228,8 +254,8 @@ export default function Options() {
                         }
                       />
                       <span>
-                        <strong>Cor automatica por dominio</strong>
-                        <small>Cada dominio recebe sempre a mesma cor.</small>
+                        <strong>Automatic color per site</strong>
+                        <small>Each site always gets the same color.</small>
                       </span>
                     </label>
                   </div>
@@ -243,19 +269,18 @@ export default function Options() {
                     onChange={() => void update({ autoGroupMode: 'preset' })}
                   />
                   <span>
-                    <strong>Por predefinicao</strong>
+                    <strong>By preset</strong>
                     <small>
-                      Voce define o nome do grupo e quais dominios entram nele. Dominios fora das
-                      predefinicoes ficam soltos. O grupo e procurado pelo nome da predefinicao e,
-                      se nao existir, criado quando houver abas soltas suficientes (veja o minimo
-                      abaixo).
+                      You define the group name and which sites go into it. Sites outside the
+                      presets stay loose. The group is looked up by the preset name and, if it does
+                      not exist, created once there are enough loose tabs (see the minimum below).
                     </small>
                   </span>
                 </label>
 
                 {settings.autoGroupMode === 'preset' && (
                   <div className="modes__body">
-                    {presetDrafts.length === 0 && <p className="muted">Nenhuma predefinicao ainda.</p>}
+                    {presetDrafts.length === 0 && <p className="muted">No presets yet.</p>}
 
                     {presetDrafts.map((preset) => (
                       <div className="preset" key={preset.id}>
@@ -263,7 +288,7 @@ export default function Options() {
                           <input
                             type="text"
                             className="preset__title"
-                            placeholder="Nome do grupo (ex.: Trabalho)"
+                            placeholder="Group name (e.g. Work)"
                             value={preset.title}
                             onChange={(event) =>
                               patchPreset(preset.id, { title: event.target.value })
@@ -273,12 +298,12 @@ export default function Options() {
                           <button
                             type="button"
                             className="btn btn--danger"
-                            title="Remover predefinicao"
+                            title="Remove preset"
                             onClick={() =>
                               commitPresets(presetDrafts.filter((item) => item.id !== preset.id))
                             }
                           >
-                            Remover
+                            Remove
                           </button>
                         </div>
 
@@ -295,16 +320,16 @@ export default function Options() {
                           onBlur={() => commitPresets(presetDrafts)}
                         />
                         <small className="muted">
-                          Um dominio por linha. Subdominios entram junto ("google.com" pega
-                          "docs.google.com"). Com porta, o casamento e exato: "localhost:3000" pega
-                          so essa porta, "localhost" pega todas.
+                          One site per line. Subdomains are included ("google.com" catches
+                          "docs.google.com"). With a port, the match is exact: "localhost:3000"
+                          catches only that port, "localhost" catches all of them.
                         </small>
 
                       </div>
                     ))}
 
                     <button type="button" className="btn" onClick={addPreset}>
-                      Adicionar predefinicao
+                      Add preset
                     </button>
                   </div>
                 )}
@@ -313,11 +338,11 @@ export default function Options() {
 
             <label className="row row--inline">
               <span>
-                <strong>Minimo de abas para criar um grupo</strong>
+                <strong>Minimum tabs to create a group</strong>
                 <small>
-                  Vale para os dois modos: um grupo novo so nasce com essa quantidade de abas soltas
-                  (do mesmo dominio, ou da mesma predefinicao). Com 1, o grupo e criado ja na
-                  primeira aba. Entrar em um grupo que ja existe nao depende disso.
+                  Applies to both modes: a new group is only born with this many loose tabs (from
+                  the same site, or the same preset). With 1, the group is created on the very
+                  first tab. Joining a group that already exists does not depend on this.
                 </small>
               </span>
               <input
@@ -338,14 +363,17 @@ export default function Options() {
                 onChange={(event) => void update({ collapseNewGroups: event.target.checked })}
               />
               <span>
-                <strong>Recolher grupos recem-criados</strong>
-                <small>Deixa a barra de abas mais limpa logo apos agrupar.</small>
+                <strong>Collapse newly created groups</strong>
+                <small>
+                  Keeps the tab strip tidy right after grouping. A group holding the active tab
+                  cannot be collapsed by the browser, so it collapses on the next tab switch.
+                </small>
               </span>
             </label>
           </section>
 
           <section className="card">
-            <h2>Barra de abas</h2>
+            <h2>Tab strip</h2>
 
             <label className="row">
               <input
@@ -354,24 +382,22 @@ export default function Options() {
                 onChange={(event) => void update({ collapseOnTabSwitch: event.target.checked })}
               />
               <span>
-                <strong>Recolher os grupos sem predefinicao ao trocar de aba</strong>
+                <strong>Collapse groups on tab switch</strong>
                 <small>
-                  Vale para os grupos que <strong>nao</strong> tem uma predefinicao com o mesmo
-                  nome: esses seguem a caixa "Recolher este grupo ao trocar de aba" da propria
-                  predefinicao, ligada ou desligada aqui. O Chrome nao permite recolher o grupo que
-                  contem a aba ativa, entao esse continua aberto.
+                  Applies to every group that has no setting of its own in the list below. The
+                  group holding the tab you switched to always stays open.
                 </small>
               </span>
             </label>
 
-            <h3 className="subhead">Por grupo</h3>
+            <h3 className="subhead">Per group</h3>
             <p className="muted">
-              Os grupos abertos agora, em qualquer janela, mais os nomes das predefinicoes. A
-              escolha aqui tem prioridade sobre a opcao acima e e guardada pelo nome do grupo —
-              renomear o grupo faz ele voltar a seguir a opcao geral.
+              The groups open right now, in any window, plus your preset names. A choice here wins
+              over the option above and is stored by group name — renaming a group makes it follow
+              the general option again.
             </p>
 
-            {groupRows.length === 0 && <p className="muted">Nenhum grupo aberto no momento.</p>}
+            {groupRows.length === 0 && <p className="muted">No groups open right now.</p>}
 
             {groupRows.map((row) => {
               const own = settings.groupCollapse[groupCollapseKey(row.title)]
@@ -393,9 +419,9 @@ export default function Options() {
                     className="exceptions__dot"
                     style={{ background: groupColorHex(row.color, dark) }}
                   />
-                  <span className="grouprow__name">{row.title.trim() || '(sem nome)'}</span>
+                  <span className="grouprow__name">{row.title.trim() || '(unnamed)'}</span>
                   <span className="muted">
-                    {own === undefined ? 'seguindo a opcao geral' : own ? 'recolhe' : 'fica aberto'}
+                    {own === undefined ? 'follows the general option' : own ? 'collapses' : 'stays open'}
                   </span>
                 </label>
               )
@@ -403,19 +429,19 @@ export default function Options() {
           </section>
 
           <section className="card">
-            <h2>Cor padrao</h2>
+            <h2>Default color</h2>
             <p className="muted">
-              Usada quando a cor automatica esta desligada. As cores sao as mesmas do Chrome e
-              acompanham o tema claro/escuro do sistema, como na barra de abas.
+              Used when the automatic color is off. The colors mirror the browser's own palette and
+              follow the system light/dark theme, like the tab strip does.
             </p>
             {swatches(settings.defaultColor, (color) => void update({ defaultColor: color }))}
           </section>
 
           <section className="card">
-            <h2>Dominios ignorados</h2>
+            <h2>Ignored sites</h2>
             <p className="muted">
-              Um por linha. Essas abas nunca sao agrupadas automaticamente. Mesma regra de porta das
-              predefinicoes: "localhost" ignora todas as portas, "localhost:3000" so aquela.
+              One per line. These tabs are never grouped automatically. Same port rule as the
+              presets: "localhost" ignores every port, "localhost:3000" only that one.
             </p>
             <textarea
               rows={6}
@@ -425,7 +451,7 @@ export default function Options() {
               spellCheck={false}
             />
             <button type="button" className="btn" onClick={commitIgnored}>
-              Salvar lista
+              Save list
             </button>
           </section>
         </>
@@ -433,34 +459,52 @@ export default function Options() {
 
       {tab === 'rename' && (
         <section className="card">
-          <h2>Renomear abas</h2>
+          <h2>Rename tabs</h2>
 
           <label className="row">
             <input
               type="checkbox"
               checked={settings.renameTabs}
-              onChange={(event) => void update({ renameTabs: event.target.checked })}
+              onChange={(event) => void toggleRename(event.target.checked)}
             />
             <span>
-              <strong>Aplicar nomes proprios as abas</strong>
+              <strong>Apply your own names to tabs</strong>
               <small>
-                Quando a pagina carrega e a URL casa com uma regra, o titulo da aba passa a ser o
-                nome definido. Vale so para http/https. Se o site trocar o titulo depois, a
-                extensao reaplica o seu.
+                When a page loads and its URL matches a rule, the tab title becomes the name you
+                set. Works on http/https only. If the site changes the title later, the extension
+                puts yours back.
+              </small>
+              <small>
+                Turning this on asks for access to websites: the title only exists inside the page
+                itself, so there is no other way to change it. Nothing is read or sent anywhere,
+                and turning this off hands the access back. The rest of the extension does not
+                need it.
               </small>
             </span>
           </label>
 
+          {settings.renameTabs && !renameAccess && (
+            <div className="warn">
+              <span>
+                <strong>Website access was revoked.</strong> Renaming is on but cannot run on
+                pages — the access was removed in chrome://extensions.
+              </span>
+              <button type="button" className="btn" onClick={() => void requestRenameAccess()}>
+                Grant access
+              </button>
+            </div>
+          )}
+
           <p className="muted">
-            A primeira regra que casar e a que vale, de cima para baixo. O padrao pode ser um pedaco
-            da URL ("github.com/koredata") ou usar "*" ("https://*.atlassian.net/browse/*").
+            The first rule that matches wins, top to bottom. The pattern can be a piece of the URL
+            ("github.com/my-org") or use "*" ("https://*.atlassian.net/browse/*").
           </p>
 
-          {ruleDrafts.length === 0 && <p className="muted">Nenhuma regra ainda.</p>}
+          {ruleDrafts.length === 0 && <p className="muted">No rules yet.</p>}
 
           {ruleDrafts.map((rule) => (
             <div className="rule" key={rule.id}>
-              <label className="rule__toggle" title="Ativar ou desativar esta regra">
+              <label className="rule__toggle" title="Enable or disable this rule">
                 <input
                   type="checkbox"
                   checked={rule.enabled}
@@ -470,7 +514,7 @@ export default function Options() {
               <input
                 type="text"
                 className="rule__pattern"
-                placeholder="URL ou padrao (ex.: mail.google.com/chat)"
+                placeholder="URL or pattern (e.g. mail.google.com/chat)"
                 value={rule.pattern}
                 spellCheck={false}
                 onChange={(event) => patchRule(rule.id, { pattern: event.target.value })}
@@ -479,7 +523,7 @@ export default function Options() {
               <input
                 type="text"
                 className="rule__title"
-                placeholder="Nome da aba"
+                placeholder="Tab name"
                 value={rule.title}
                 onChange={(event) => patchRule(rule.id, { title: event.target.value })}
                 onBlur={() => commitRules(ruleDrafts)}
@@ -487,22 +531,22 @@ export default function Options() {
               <button
                 type="button"
                 className="btn btn--danger"
-                title="Remover regra"
+                title="Remove rule"
                 onClick={() => commitRules(ruleDrafts.filter((item) => item.id !== rule.id))}
               >
-                Remover
+                Remove
               </button>
             </div>
           ))}
 
           <button type="button" className="btn" onClick={addRule}>
-            Adicionar regra
+            Add rule
           </button>
 
           <small className="muted">
-            Regras sem padrao ou sem nome nao sao salvas. A renomeacao vale enquanto a aba estiver
-            aberta: recarregar a pagina reaplica, e remover a regra volta o titulo original no
-            proximo carregamento.
+            Rules without a pattern or without a name are not saved. Renaming lasts while the tab
+            is open: reloading the page applies it again, and removing the rule restores the
+            original title on the next load.
           </small>
         </section>
       )}
@@ -521,10 +565,10 @@ export default function Options() {
             })
           }
         >
-          Restaurar padroes
+          Restore defaults
         </button>
         <span className="saved" data-visible={savedAt > 0}>
-          Salvo ✓
+          Saved ✓
         </span>
       </footer>
     </main>

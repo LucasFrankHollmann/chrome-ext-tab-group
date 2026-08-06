@@ -367,3 +367,25 @@ textarea {
 .saved[data-visible='true'] {
   opacity: 1;
 }
+
+/* ---------- aviso de permissao pendente ---------- */
+
+.warn {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.warn span {
+  flex: 1;
+}
+
+.warn .btn {
+  flex: none;
+  align-self: center;
+  background: var(--card);
+}

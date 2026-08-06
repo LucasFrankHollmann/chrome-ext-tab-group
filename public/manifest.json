@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Tab Group",
-  "version": "0.1.0",
-  "description": "Organize suas abas em grupos: agrupe por dominio, crie grupos manuais e gerencie tudo em um popup.",
+  "name": "Tytab",
+  "version": "1.0.0",
+  "description": "Organize your tabs: group by site or by rule, collapse groups automatically, and rename tabs by URL.",
   "minimum_chrome_version": "116",
   "permissions": ["tabs", "tabGroups", "storage", "contextMenus", "scripting"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "action": {
-    "default_title": "Tab Group",
+    "default_title": "Tytab",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
