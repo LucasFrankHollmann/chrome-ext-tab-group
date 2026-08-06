@@ -259,21 +259,29 @@ export function shouldCollapseGroup(
 
 /**
  * Recolhe os grupos da janela na troca de aba, conforme `shouldCollapseGroup`.
+ * O grupo que contem a aba recem-ativada fica de fora: e onde o usuario esta.
  * Devolve quantos foram recolhidos.
  *
  * Registra no console a decisao de cada grupo — e a unica forma de ver por que
- * um grupo nao recolheu (preferencia propria, opcao geral desligada, ou aba
- * ativa dentro, que o Chrome recusa).
+ * um grupo nao recolheu (aba ativa dentro, preferencia propria, ou opcao geral
+ * desligada).
  */
 export async function collapseForTabSwitch(
   windowId: number,
   settings: Settings,
 ): Promise<number> {
   const groups = await chrome.tabGroups.query({ windowId })
+  // A aba ativa e consultada de proposito em vez de deixar o Chrome recusar o
+  // recolher: a recusa e um erro sem codigo proprio, indistinguivel de falha de
+  // verdade, e viraria erro no log a cada troca de aba.
+  const [active] = await chrome.tabs.query({ windowId, active: true })
+  const activeGroupId = active?.groupId ?? UNGROUPED
 
   const decisions = await Promise.all(
     groups.map(async (group) => {
       const label = `"${group.title ?? ''}"`
+      if (group.id === activeGroupId) return { ok: false, note: `${label}: contem a aba ativa` }
+
       const { collapse, reason } = shouldCollapseGroup(group.title ?? '', settings)
       if (!collapse) return { ok: false, note: `${label}: intacto (${reason})` }
       if (group.collapsed) return { ok: false, note: `${label}: ja estava recolhido` }
@@ -282,7 +290,7 @@ export async function collapseForTabSwitch(
         await chrome.tabGroups.update(group.id, { collapsed: true })
         return { ok: true, note: `${label}: recolhido` }
       } catch (error) {
-        // Quase sempre e o grupo da aba ativa, que o Chrome nao deixa recolher.
+        // Sobra o inesperado: aba sendo arrastada, janela em transicao.
         return { ok: false, note: `${label}: recusado pelo Chrome (${String(error)})` }
       }
     }),
