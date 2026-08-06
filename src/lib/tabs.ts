@@ -10,6 +10,7 @@ import {
 import { getSettings } from './storage'
 import {
   GROUP_COLORS,
+  groupCollapseKey,
   UNGROUPED,
   type GroupColor,
   type GroupInfo,
@@ -116,8 +117,66 @@ export async function groupTabs(
     groupId = await chrome.tabs.group({ tabIds: ids })
   }
 
-  await chrome.tabGroups.update(groupId, { title, color, collapsed })
+  await chrome.tabGroups.update(groupId, { title, color })
+  // Recolher e uma etapa separada: o Chrome recusa recolher o grupo que contem a
+  // aba ativa (comum quando o grupo nasce com uma aba so). Falhar aqui nao pode
+  // desfazer o nome/cor nem derrubar quem chamou.
+  if (collapsed) {
+    try {
+      await chrome.tabGroups.update(groupId, { collapsed: true })
+    } catch (error) {
+      // Fica na fila: recolhe na primeira troca de aba, quando a aba ativa sair.
+      console.warn('[tab-group] grupo', groupId, 'nao pode ser recolhido agora:', error)
+      await rememberPendingCollapse(groupId)
+    }
+  }
   return groupId
+}
+
+/**
+ * Grupos que pediram para nascer recolhidos mas continham a aba ativa — o Chrome
+ * recusa recolher esse grupo, e com "minimo 1 aba" isso e a regra, nao a excecao.
+ * Fica em `storage.session` porque o service worker morre entre os eventos.
+ */
+const PENDING_COLLAPSE_KEY = 'pendingCollapse'
+
+async function readPendingCollapse(): Promise<number[]> {
+  const stored = await chrome.storage.session.get(PENDING_COLLAPSE_KEY)
+  return (stored[PENDING_COLLAPSE_KEY] as number[] | undefined) ?? []
+}
+
+async function rememberPendingCollapse(groupId: number): Promise<void> {
+  const ids = new Set(await readPendingCollapse())
+  ids.add(groupId)
+  await chrome.storage.session.set({ [PENDING_COLLAPSE_KEY]: [...ids] })
+}
+
+/**
+ * Nova tentativa de recolher os grupos da fila. Quem continua com a aba ativa
+ * dentro fica para a proxima; grupo que nao existe mais sai da fila.
+ */
+export async function collapsePendingGroups(): Promise<number> {
+  const ids = await readPendingCollapse()
+  if (ids.length === 0) return 0
+
+  const remaining: number[] = []
+  let collapsed = 0
+
+  for (const id of ids) {
+    try {
+      await chrome.tabGroups.update(id, { collapsed: true })
+      collapsed++
+    } catch {
+      const alive = await chrome.tabGroups
+        .get(id)
+        .then(() => true)
+        .catch(() => false)
+      if (alive) remaining.push(id)
+    }
+  }
+
+  await chrome.storage.session.set({ [PENDING_COLLAPSE_KEY]: remaining })
+  return collapsed
 }
 
 /** Adiciona abas a um grupo ja existente. */
@@ -173,6 +232,67 @@ export async function collapseAll(windowId: number, collapsed: boolean): Promise
   return results.filter(Boolean).length
 }
 
+/**
+ * Decide, pelo nome, se o grupo deve recolher na troca de aba. Ordem: a
+ * preferencia do proprio grupo, depois a predefinicao de mesmo nome (legado), e
+ * por fim a opcao geral. Devolve tambem o motivo, para o log.
+ */
+export function shouldCollapseGroup(
+  title: string,
+  settings: Settings,
+): { collapse: boolean; reason: string } {
+  const own = settings.groupCollapse[groupCollapseKey(title)]
+  if (own !== undefined) {
+    return { collapse: own, reason: own ? 'preferencia do grupo' : 'grupo marcado para ficar aberto' }
+  }
+
+  const preset = settings.presets.find((item) => sameLabel(item.title, title))
+  if (preset?.collapseOnTabSwitch === false) {
+    return { collapse: false, reason: 'predefinicao antiga pede para ficar aberto' }
+  }
+
+  return {
+    collapse: settings.collapseOnTabSwitch,
+    reason: settings.collapseOnTabSwitch ? 'opcao geral' : 'opcao geral desligada',
+  }
+}
+
+/**
+ * Recolhe os grupos da janela na troca de aba, conforme `shouldCollapseGroup`.
+ * Devolve quantos foram recolhidos.
+ *
+ * Registra no console a decisao de cada grupo — e a unica forma de ver por que
+ * um grupo nao recolheu (preferencia propria, opcao geral desligada, ou aba
+ * ativa dentro, que o Chrome recusa).
+ */
+export async function collapseForTabSwitch(
+  windowId: number,
+  settings: Settings,
+): Promise<number> {
+  const groups = await chrome.tabGroups.query({ windowId })
+
+  const decisions = await Promise.all(
+    groups.map(async (group) => {
+      const label = `"${group.title ?? ''}"`
+      const { collapse, reason } = shouldCollapseGroup(group.title ?? '', settings)
+      if (!collapse) return { ok: false, note: `${label}: intacto (${reason})` }
+      if (group.collapsed) return { ok: false, note: `${label}: ja estava recolhido` }
+
+      try {
+        await chrome.tabGroups.update(group.id, { collapsed: true })
+        return { ok: true, note: `${label}: recolhido` }
+      } catch (error) {
+        // Quase sempre e o grupo da aba ativa, que o Chrome nao deixa recolher.
+        return { ok: false, note: `${label}: recusado pelo Chrome (${String(error)})` }
+      }
+    }),
+  )
+
+  const report = decisions.map((item) => item.note).join(' | ') || '(nenhum grupo)'
+  console.log(`[tab-group] janela ${windowId}: ${report}`)
+  return decisions.filter((item) => item.ok).length
+}
+
 /** Recolhe todos os grupos menos o da aba ativa — util para focar no que importa. */
 export async function collapseOthers(windowId: number): Promise<void> {
   const [active] = await chrome.tabs.query({ windowId, active: true })
@@ -210,6 +330,9 @@ export async function groupByDomain(
   const result: GroupByDomainResult = { createdGroups: 0, groupedTabs: 0 }
 
   for (const [domain, domainTabs] of groupBy(tabs, (tab) => tab.domain)) {
+    // Paginas internas (nova aba, chrome://, file://) nao formam grupo: com
+    // minimo 1 cada uma viraria um grupo "navegador"/"arquivos" sem sentido.
+    if (!isSiteDomain(domain)) continue
     if (settings.ignoredDomains.some((entry) => domainMatches(domain, entry))) continue
     if (domainTabs.length < Math.max(1, settings.minTabsPerGroup)) continue
 

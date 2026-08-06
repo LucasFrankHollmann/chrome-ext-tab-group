@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Organize suas abas em grupos: agrupe por dominio, crie grupos manuais e gerencie tudo em um popup.",
   "minimum_chrome_version": "116",
-  "permissions": ["tabs", "tabGroups", "storage", "contextMenus"],
+  "permissions": ["tabs", "tabGroups", "storage", "contextMenus", "scripting"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_title": "Tab Group",
     "default_popup": "popup.html",

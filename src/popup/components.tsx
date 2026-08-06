@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useDarkMode } from '@/lib/useDarkMode'
 import {
   GROUP_COLORS,
-  GROUP_COLOR_HEX,
   GROUP_COLOR_LABELS,
+  groupColorHex,
   type GroupColor,
   type GroupInfo,
   type TabInfo,
@@ -38,6 +39,8 @@ export function ColorPicker({
   value: GroupColor
   onChange: (color: GroupColor) => void
 }) {
+  const dark = useDarkMode()
+
   return (
     <div className="color-select" role="group" aria-label="Cor do grupo">
       {GROUP_COLORS.map((color) => (
@@ -45,7 +48,7 @@ export function ColorPicker({
           key={color}
           type="button"
           className="swatch"
-          style={{ background: GROUP_COLOR_HEX[color] }}
+          style={{ background: groupColorHex(color, dark) }}
           aria-pressed={value === color}
           aria-label={GROUP_COLOR_LABELS[color]}
           title={GROUP_COLOR_LABELS[color]}
@@ -141,6 +144,7 @@ export function GroupHeader({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(group?.title ?? '')
   const isCollapsed = collapsed ?? group?.collapsed ?? false
+  const dark = useDarkMode()
 
   const commit = () => {
     setEditing(false)
@@ -171,7 +175,7 @@ export function GroupHeader({
       )}
 
       {group ? (
-        <span className="group__dot" style={{ background: GROUP_COLOR_HEX[group.color] }} />
+        <span className="group__dot" style={{ background: groupColorHex(group.color, dark) }} />
       ) : (
         <span className="group__dot" style={{ background: 'var(--text-muted)' }} />
       )}

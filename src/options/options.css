@@ -91,6 +91,141 @@ body {
   flex: none;
 }
 
+/* ---------- abas das configuracoes ---------- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs__item {
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+
+.tabs__item[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- regras de renomeacao ---------- */
+
+.rule {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rule__toggle {
+  display: flex;
+  flex: none;
+}
+
+.rule__toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.rule input[type='text'] {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  min-width: 0;
+}
+
+.rule__pattern {
+  flex: 3;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+}
+
+.rule__title {
+  flex: 2;
+}
+
+.rule .btn {
+  flex: none;
+  align-self: stretch;
+  background: var(--card);
+}
+
+/* ---------- preferencia de recolher por grupo ---------- */
+
+.subhead {
+  margin: 4px 0 -6px;
+  font-size: 14px;
+}
+
+.grouprow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+}
+
+.grouprow input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.grouprow__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grouprow .muted {
+  margin: 0;
+  flex: none;
+}
+
+/* ---------- resumo de excecoes do recolher ---------- */
+
+.exceptions {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.exceptions li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.exceptions__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
 /* ---------- modos do agrupamento automatico ---------- */
 
 .modes {
